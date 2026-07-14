@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
-import { useAuth, User, Student, Teacher, Course, AttendanceLog, Justification, IDCard } from '@/context/AuthContext';
+import { useAuth, User, Student, Teacher, Course, AttendanceLog, Justification, IDCard, SchoolEvent, ClassSchedule } from '@/context/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
 import { Topbar } from '@/components/Topbar';
 import { supabase } from '@/lib/supabase';
@@ -2885,7 +2885,18 @@ const AdminStudentsView: React.FC<SubViewProps> = ({ showToast }) => {
 const AdminTeachersView: React.FC<SubViewProps> = ({ showToast }) => {
   const { teachers, classrooms, saveTeacher, deleteTeacher } = useAuth();
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    id: string;
+    numero_documento: string;
+    nombres: string;
+    apellidos: string;
+    correo: string;
+    celular: string;
+    direccion: string;
+    id_rol: number;
+    materia_especialidad: string;
+    id_aula_tutor: string | number;
+  }>({
     id: '',
     numero_documento: '',
     nombres: '',
@@ -4891,7 +4902,7 @@ const AdminStaffLogsView: React.FC<SubViewProps> = ({ showToast }) => {
               })}
               {filteredRoster.length === 0 && (
                 <tr>
-                  <td colspan="7" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
+                  <td colSpan={7} style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
                     No se encontró personal que coincida con los filtros aplicados.
                   </td>
                 </tr>
@@ -5492,13 +5503,13 @@ const TimetableScheduleView: React.FC<TimetableProps> = ({ showToast, isAdminVie
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
   
-  const [schedDay, setSchedDay] = useState<'Lunes' | 'Martes' | 'Miércoles' | 'Jueves' | 'Viernes' | 'Sábado'>('Lunes');
+  const [schedDay, setSchedDay] = useState<'Lunes' | 'Martes' | 'Miércoles' | 'Jueves' | 'Viernes' | 'Sábado' | 'Domingo'>('Lunes');
   const [schedStart, setSchedStart] = useState('08:00');
   const [schedEnd, setSchedEnd] = useState('09:30');
   const [schedSubject, setSchedSubject] = useState('');
 
-  const daysOfWeek: ('Lunes' | 'Martes' | 'Miércoles' | 'Jueves' | 'Viernes' | 'Sábado')[] = [
-    'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'
+  const daysOfWeek: ('Lunes' | 'Martes' | 'Miércoles' | 'Jueves' | 'Viernes' | 'Sábado' | 'Domingo')[] = [
+    'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'
   ];
 
   const timeSlots = [

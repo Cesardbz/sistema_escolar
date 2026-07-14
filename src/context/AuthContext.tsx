@@ -101,7 +101,7 @@ export interface SchoolEvent {
 export interface ClassSchedule {
   id: string;
   classroomId: number;
-  dayOfWeek: 'Lunes' | 'Martes' | 'Miércoles' | 'Jueves' | 'Viernes';
+  dayOfWeek: 'Lunes' | 'Martes' | 'Miércoles' | 'Jueves' | 'Viernes' | 'Sábado' | 'Domingo';
   startTime: string; // HH:MM
   endTime: string; // HH:MM
   subject: string;
@@ -1116,7 +1116,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await supabase.from('estudiante_aula').insert(dbEstudianteAula);
 
       // Generar asistencias de simulación (Días 2026-07-08 y 2026-07-09)
-      const logsToInsert = [];
+      const logsToInsert: any[] = [];
       const dates = ['2026-07-08', '2026-07-09'];
 
       dates.forEach(date => {

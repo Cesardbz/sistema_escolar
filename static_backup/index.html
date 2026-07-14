@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sistema de Control de Asistencia - Colegio San José de Calasanz</title>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- QRCode.js and JsBarcode CDNs -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+  <!-- Estilos del Sistema -->
+  <link rel="stylesheet" href="styles.css">
+  <!-- Supabase JS Client SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+  <!-- ==========================================
+       PANTALLA DE LOGIN
+       ========================================== -->
+  <div id="login-container" class="login-screen-container">
+    <div class="login-card">
+      <div class="login-header">
+        <div class="login-logo">
+          <i class="fa-solid fa-graduation-cap"></i>
+        </div>
+        <h2>Sistema de Asistencia</h2>
+        <p>Colegio San José de Calasanz</p>
+      </div>
+      
+      <div class="login-error-box" id="login-error-box">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        <span id="login-error-msg">Correo o contraseña incorrectos.</span>
+      </div>
+
+      <form class="login-form" id="login-form">
+        <div class="form-group">
+          <label class="form-label">Correo Electrónico</label>
+          <input type="email" id="login-email" class="form-control" placeholder="ejemplo@colegio.edu.pe" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Contraseña</label>
+          <input type="password" id="login-password" class="form-control" placeholder="••••••••" required>
+        </div>
+        <button type="submit" class="login-btn">
+          <span>Ingresar al Sistema</span>
+          <i class="fa-solid fa-arrow-right-to-bracket"></i>
+        </button>
+      </form>
+
+      <div class="quick-login-section">
+        <div class="quick-login-title">Accesos de Prueba</div>
+        <div class="quick-login-grid">
+          <button class="quick-login-btn" type="button" onclick="quickLogin('admin@colegio.edu.pe', 'admin')">
+            <i class="fa-solid fa-user-shield"></i>
+            <span>Admin</span>
+          </button>
+          <button class="quick-login-btn" type="button" onclick="quickLogin('ana.gomez@colegio.edu.pe', 'password123')">
+            <i class="fa-solid fa-chalkboard-user"></i>
+            <span>Docente</span>
+          </button>
+          <button class="quick-login-btn" type="button" onclick="quickLogin('mateo.silva@colegio.edu.pe', 'password123')">
+            <i class="fa-solid fa-user-graduate"></i>
+            <span>Alumno</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="app-container" class="hidden">
+    
+    <!-- ==========================================
+         BARRA LATERAL (SIDEBAR)
+         ========================================== -->
+    <aside class="sidebar" id="app-sidebar">
+      <div class="sidebar-header">
+        <div class="logo-container">
+          <i class="fa-solid fa-graduation-cap"></i>
+        </div>
+        <div class="logo-text">
+          S.C.A.
+          <span>Colegio Calasanz</span>
+        </div>
+      </div>
+      
+      <!-- Menú adaptable por JS según el Rol -->
+      <ul class="sidebar-menu" id="sidebar-menu-items">
+        <!-- ROL: ADMINISTRATIVO -->
+        <li class="menu-item active" data-role="admin" data-view="admin-dashboard">
+          <a href="#"><i class="fa-solid fa-chart-line"></i><span>Inicio (Dashboard)</span></a>
+        </li>
+        <li class="menu-item" data-role="admin" data-view="admin-logs">
+          <a href="#"><i class="fa-solid fa-calendar-days"></i><span>Asistencia Diaria</span></a>
+        </li>
+        <li class="menu-item" data-role="admin" data-view="admin-justifications">
+          <a href="#"><i class="fa-solid fa-file-signature"></i><span>Justificaciones</span></a>
+        </li>
+        <li class="menu-item" data-role="admin" data-view="admin-students">
+          <a href="#"><i class="fa-solid fa-users"></i><span>Estudiantes</span></a>
+        </li>
+        <li class="menu-item" data-role="admin" data-view="admin-teachers">
+          <a href="#"><i class="fa-solid fa-chalkboard-user"></i><span>Docentes</span></a>
+        </li>
+        <li class="menu-item" data-role="admin" data-view="admin-cards">
+          <a href="#"><i class="fa-solid fa-address-card"></i><span>Tarjetas ID</span></a>
+        </li>
+        
+        <!-- ROL: DOCENTE -->
+        <li class="menu-item" data-role="teacher" data-view="teacher-dashboard" style="display:none;">
+          <a href="#"><i class="fa-solid fa-clipboard-user"></i><span>Panel Docente</span></a>
+        </li>
+        <li class="menu-item" data-role="teacher" data-view="teacher-register" style="display:none;">
+          <a href="#"><i class="fa-solid fa-user-check"></i><span>Tomar Asistencia</span></a>
+        </li>
+        
+        <!-- ROL: ESTUDIANTE -->
+        <li class="menu-item" data-role="student" data-view="student-dashboard" style="display:none;">
+          <a href="#"><i class="fa-solid fa-user-clock"></i><span>Mi Asistencia</span></a>
+        </li>
+        <!-- CERRAR SESIÓN -->
+        <li class="menu-item logout-menu-item" id="sidebar-logout-btn">
+          <a href="#"><i class="fa-solid fa-right-from-bracket"></i><span>Cerrar Sesión</span></a>
+        </li>
+      </ul>
+      
+      <div class="sidebar-footer">
+        <div class="user-quick-profile">
+          <img id="user-profile-img" src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=150" alt="Avatar Usuario">
+          <div class="profile-info">
+            <h4 id="user-profile-name">José Calasanz</h4>
+            <p id="user-profile-role">Administrador</p>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ==========================================
+         CONTENIDO PRINCIPAL
+         ========================================== -->
+    <main class="main-content">
+      
+      <!-- BARRA SUPERIOR (TOP BAR) -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <button class="menu-toggle-btn" id="menu-toggle"><i class="fa-solid fa-bars"></i></button>
+          <div class="system-title" id="system-top-title">Colegio San José de Calasanz</div>
+        </div>
+        
+        <div class="topbar-right">
+          <!-- Selector de Roles para el Simulador -->
+          <div class="role-picker-container">
+            <span>ROL ACTIVO:</span>
+            <select class="role-selector" id="role-selector-sim">
+              <option value="admin">Administrativo</option>
+              <option value="teacher">Docente</option>
+              <option value="student">Estudiante</option>
+            </select>
+          </div>
+          
+          <div class="topbar-actions">
+            <button class="icon-badge-btn" title="Notificaciones" id="notif-btn">
+              <i class="fa-regular fa-bell"></i>
+              <span class="badge" id="notif-badge"></span>
+            </button>
+            <button class="icon-badge-btn" title="Reiniciar Datos del Simulador" onclick="AttendanceDB.resetDatabase()">
+              <i class="fa-solid fa-arrow-rotate-left"></i>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <!-- ====================================================================
+           VISTAS DINÁMICAS (PANELS)
+           ==================================================================== -->
+      
+      <!-- 1. VISTA: PANEL GENERAL ADMINISTRATIVO (DASHBOARD) -->
+      <section class="view-panel active" id="view-admin-dashboard">
+        <div class="panel-header">
+          <h2 class="panel-title">Panel de Control de Asistencia</h2>
+          <p class="panel-subtitle">Resumen diario y estadísticas de la institución educativa</p>
+        </div>
+
+        <!-- Tarjetas de Métricas -->
+        <div class="stats-grid">
+          <div class="stat-card primary">
+            <div class="stat-icon"><i class="fa-solid fa-percent"></i></div>
+            <div class="stat-info">
+              <span class="stat-value" id="admin-stat-percent">96.5%</span>
+              <span class="stat-label">Asistencia Promedio</span>
+            </div>
+          </div>
+          <div class="stat-card success">
+            <div class="stat-icon"><i class="fa-solid fa-user-check"></i></div>
+            <div class="stat-info">
+              <span class="stat-value" id="admin-stat-present">12</span>
+              <span class="stat-label">Presentes Hoy</span>
+            </div>
+          </div>
+          <div class="stat-card warning">
+            <div class="stat-icon"><i class="fa-solid fa-user-clock"></i></div>
+            <div class="stat-info">
+              <span class="stat-value" id="admin-stat-late">2</span>
+              <span class="stat-label">Tardanzas Hoy</span>
+            </div>
+          </div>
+          <div class="stat-card danger">
+            <div class="stat-icon"><i class="fa-solid fa-user-xmark"></i></div>
+            <div class="stat-info">
+              <span class="stat-value" id="admin-stat-absent">1</span>
+              <span class="stat-label">Ausentes Hoy</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Gráficos y Tablas Integradas (Visualización Screenshot) -->
+        <div class="dashboard-grid">
+          
+          <!-- Columna 1: Gráficos y Listas Rápidas -->
+          <div class="dashboard-col">
+            
+            <!-- Resumen Diario Grafico -->
+            <div class="card">
+              <div class="card-header">
+                <h3 class="card-title"><i class="fa-solid fa-chart-simple"></i>RESUMEN DIARIO</h3>
+                <span class="card-subtitle" id="daily-summary-date">Hoy</span>
+              </div>
+              <div style="height: 220px; position: relative;">
+                <canvas id="chart-resumen-diario"></canvas>
+              </div>
+            </div>
+
+            <!-- Fila de Listas de Alertas y Tardanzas -->
+            <div class="row-cards">
+              <div class="card">
+                <div class="card-header">
+                  <h3 class="card-title" style="color: var(--warning);"><i class="fa-solid fa-triangle-exclamation"></i>Alertas de Ausentismo</h3>
+                </div>
+                <div class="alert-list" id="absentee-alerts-list">
+                  <!-- Llenado dinámico -->
+                </div>
+              </div>
+              
+              <div class="card">
+                <div class="card-header">
+                  <h3 class="card-title" style="color: var(--info);"><i class="fa-solid fa-clock-rotate-left"></i>Tardanzas Recientes</h3>
+                </div>
+                <div class="alert-list" id="recent-lates-list">
+                  <!-- Llenado dinámico -->
+                </div>
+              </div>
+            </div>
+
+            <!-- Gráfico Asistencia Semanal -->
+            <div class="card">
+              <div class="card-header">
+                <h3 class="card-title"><i class="fa-solid fa-chart-column"></i>Asistencia Semanal: Estudiantes</h3>
+              </div>
+              <div style="height: 220px; position: relative;">
+                <canvas id="chart-weekly"></canvas>
+              </div>
+            </div>
+
+            <!-- Gráfico Distribución por Grado -->
+            <div class="card">
+              <div class="card-header">
+                <h3 class="card-title"><i class="fa-solid fa-chart-pie"></i>Distribución por Grado</h3>
+              </div>
+              <div style="height: 220px; position: relative;">
+                <canvas id="chart-grade-dist"></canvas>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Columna 2: Tabla de Logs (Últimos Registros) -->
+          <div class="dashboard-col" id="main-attendance-table-column">
+            <div class="card table-card" id="main-attendance-table-card">
+              <div class="card-header">
+                <h3 class="card-title"><i class="fa-solid fa-list-check"></i>Últimos Registros de Asistencia</h3>
+                <button class="btn-primary" id="open-add-log-btn" style="padding: 6px 12px; font-size: 0.8rem;">
+                  <i class="fa-solid fa-plus"></i>Nuevo Registro
+                </button>
+              </div>
+
+              <!-- Filtros -->
+              <div class="filters-row">
+                <div class="search-wrapper">
+                  <i class="fa-solid fa-magnifying-glass"></i>
+                  <input type="text" class="search-input" id="log-search" placeholder="Buscar estudiante o docente...">
+                </div>
+                <input type="date" class="filter-date" id="filter-date">
+                <select class="filter-select" id="filter-grade">
+                  <option value="">Grado: Todos</option>
+                  <option value="3º Primaria">3º Primaria</option>
+                  <option value="1º Secundaria">1º Secundaria</option>
+                  <option value="2º Secundaria">2º Secundaria</option>
+                  <option value="4º Secundaria">4º Secundaria</option>
+                  <option value="5º Secundaria">5º Secundaria</option>
+                </select>
+                <select class="filter-select" id="filter-state">
+                  <option value="">Estado: Todos</option>
+                  <option value="Presente">Presente</option>
+                  <option value="Tardanza">Tardanza</option>
+                  <option value="Ausente">Ausente</option>
+                  <option value="Justificado">Justificado</option>
+                </select>
+              </div>
+
+              <!-- Tabla -->
+              <div class="table-responsive">
+                <table class="custom-table" id="logs-table">
+                  <thead>
+                    <tr>
+                      <th>Fecha</th>
+                      <th>Hora</th>
+                      <th>Estudiante</th>
+                      <th>Curso</th>
+                      <th>Estado</th>
+                      <th>Docente</th>
+                      <th>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody id="logs-table-body">
+                    <!-- Dinámico -->
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="table-footer">
+                <span id="table-entries-info">Mostrando 0 de 0 registros</span>
+                <div class="pagination" id="table-pagination">
+                  <!-- Dinámico -->
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- 2. VISTA: TABLA COMPLETA DE ASISTENCIA DIARIA (ADMIN) -->
+      <section class="view-panel" id="view-admin-logs">
+        <div class="panel-header">
+          <h2 class="panel-title">Asistencia Diaria Completa</h2>
+          <p class="panel-subtitle">Historial completo y herramientas de auditoría</p>
+        </div>
+        
+        <!-- Reutilizamos el contenedor de tabla del dashboard pero de forma expandida -->
+        <div class="card table-card" id="logs-expanded-card-container">
+          <!-- Movido dinámicamente con JS o renderizado análogo -->
+        </div>
+      </section>
+
+      <!-- 3. VISTA: APROBACIÓN DE JUSTIFICACIONES (ADMIN) -->
+      <section class="view-panel" id="view-admin-justifications">
+        <div class="panel-header">
+          <h2 class="panel-title">Solicitudes de Justificación</h2>
+          <p class="panel-subtitle">Revisar y aprobar justificaciones enviadas por estudiantes</p>
+        </div>
+
+        <div class="card">
+          <div class="table-responsive">
+            <table class="custom-table">
+              <thead>
+                <tr>
+                  <th>Estudiante</th>
+                  <th>Fecha Inasistencia</th>
+                  <th>Motivo / Razón</th>
+                  <th>Documento Adjunto</th>
+                  <th>Estado</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="justifications-table-body">
+                <!-- Dinámico -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. VISTA: GESTIÓN DE ESTUDIANTES (ADMIN) -->
+      <section class="view-panel" id="view-admin-students">
+        <div class="panel-header">
+          <h2 class="panel-title">Gestión de Estudiantes</h2>
+          <p class="panel-subtitle">Listado de alumnos matriculados y sus historiales de asistencia</p>
+        </div>
+        
+        <div class="card">
+          <div class="table-responsive">
+            <table class="custom-table">
+              <thead>
+                <tr>
+                  <th>Foto</th>
+                  <th>Nombre Alumno</th>
+                  <th>Grado</th>
+                  <th>Porcentaje Asistencia</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="students-table-body">
+                <!-- Dinámico -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- 5. VISTA: GESTIÓN DE DOCENTES (ADMIN) -->
+      <section class="view-panel" id="view-admin-teachers">
+        <div class="panel-header">
+          <h2 class="panel-title">Gestión de Docentes</h2>
+          <p class="panel-subtitle">Lista de profesores y personal docente registrado</p>
+        </div>
+        
+        <div class="card">
+          <div class="table-responsive">
+            <table class="custom-table">
+              <thead>
+                <tr>
+                  <th>Foto</th>
+                  <th>Nombre Docente</th>
+                  <th>Materia Asignada</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="teachers-table-body">
+                <!-- Dinámico -->
+              </tbody>
+            </table>
+          </div>
+      </section>
+
+      <!-- 5B. VISTA: GENERADOR DE CREDENCIALES (ADMIN) -->
+      <section class="view-panel" id="view-admin-cards">
+        <div class="panel-header">
+          <h2 class="panel-title">Generador de Credenciales ID</h2>
+          <p class="panel-subtitle">Emisión y visualización de tarjetas de identificación con código QR o Barras</p>
+        </div>
+
+        <div class="student-view-layout">
+          <!-- Columna Izquierda: Controles y Listado de Tarjetas -->
+          <div class="dashboard-col">
+            <!-- Formulario de Emisión -->
+            <div class="card" style="margin-bottom: 20px;">
+              <div class="card-header">
+                <h3 class="card-title"><i class="fa-solid fa-plus"></i>Emitir Credencial</h3>
+              </div>
+              <form id="card-generator-form">
+                <div class="form-group">
+                  <label class="form-label">Seleccionar Estudiante</label>
+                  <select class="form-control" id="card-student-select" required>
+                    <!-- Dinámico -->
+                  </select>
+                </div>
+                
+                <div class="form-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                  <div>
+                    <label class="form-label">Tipo de Código</label>
+                    <select class="form-control" id="card-code-type" required>
+                      <option value="QR">Código QR (Recomendado)</option>
+                      <option value="Barcode">Código de Barras</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="form-label">Código de Tarjeta</label>
+                    <div style="display: flex; gap: 8px;">
+                      <input type="text" class="form-control" id="card-code-input" placeholder="CAL-2026-0001" required>
+                      <button type="button" class="btn-secondary" id="btn-autogen-card" style="padding: 10px;" title="Auto-generar código"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
+                    </div>
+                  </div>
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; margin-top: 10px;">
+                  <button type="submit" class="btn-primary" style="width: 100%; justify-content: center;">
+                    <i class="fa-solid fa-address-card"></i>Guardar y Generar Tarjeta
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <!-- Tabla de Tarjetas Emitidas -->
+            <div class="card">
+              <div class="card-header">
+                <h3 class="card-title"><i class="fa-solid fa-list"></i>Tarjetas de Identificación Emitidas</h3>
+              </div>
+              <div class="table-responsive">
+                <table class="custom-table">
+                  <thead>
+                    <tr>
+                      <th>Estudiante</th>
+                      <th>Código Tarjeta</th>
+                      <th>Tipo</th>
+                      <th>Estado</th>
+                      <th>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody id="cards-table-body">
+                    <!-- Dinámico -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Columna Derecha: Vista Previa y Descarga de la Tarjeta PVC -->
+          <div class="dashboard-col">
+            <div class="card" style="display: flex; flex-direction: column; align-items: center;">
+              <div class="card-header" style="width: 100%;">
+                <h3 class="card-title"><i class="fa-solid fa-eye"></i>Vista Previa de Credencial</h3>
+              </div>
+              
+              <!-- Mockup PVC de la Tarjeta de Identificación -->
+              <div class="id-card-badge-container">
+                <div class="id-card-badge" id="printable-id-card">
+                  <!-- Frente de la Tarjeta -->
+                  <div class="id-card-inner-header">
+                    <div class="id-card-logo"><i class="fa-solid fa-graduation-cap"></i></div>
+                    <div class="id-card-school-info">
+                      <h4>COLEGIO SAN JOSÉ DE CALASANZ</h4>
+                      <p>Piedad y Letras</p>
+                    </div>
+                  </div>
+                  <div class="id-card-body">
+                    <img id="id-card-avatar" src="https://images.unsplash.com/photo-1503919545889-aef636e10ad4?auto=format&fit=crop&q=80&w=150" alt="Foto Estudiante">
+                    <h3 id="id-card-name">Mateo Silva</h3>
+                    <p class="id-card-title-label">ESTUDIANTE</p>
+                    <div class="id-card-details">
+                      <div><span>Grado:</span> <strong id="id-card-grade">3º Primaria</strong></div>
+                      <div><span>ID Código:</span> <strong id="id-card-code-text">CAL-2026-0001</strong></div>
+                    </div>
+                  </div>
+                  <div class="id-card-footer">
+                    <!-- Contenedor del QR o Código de Barras -->
+                    <div id="id-card-code-graphic-container">
+                      <div id="id-card-qr-graphic"></div>
+                      <svg id="id-card-barcode-graphic" style="display: none; max-width: 100%; height: auto;"></svg>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Botones de Acción sobre la Tarjeta -->
+              <div style="display: flex; gap: 12px; width: 100%; margin-top: 24px;">
+                <button type="button" class="btn-primary" id="btn-print-card" style="flex-grow: 1; justify-content: center;">
+                  <i class="fa-solid fa-print"></i>Imprimir Credencial
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           VISTAS DEL DOCENTE
+           ==================================================================== -->
+      
+      <!-- 6. VISTA: PANEL DOCENTE INICIO -->
+      <section class="view-panel" id="view-teacher-dashboard">
+        <div class="panel-header">
+          <h2 class="panel-title" id="teacher-welcome-title">Bienvenido, Docente</h2>
+          <p class="panel-subtitle">Resumen de sus asignaturas y control de asistencia personal</p>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card primary">
+            <div class="stat-icon"><i class="fa-solid fa-calendar-check"></i></div>
+            <div class="stat-info">
+              <span class="stat-value" id="teacher-stat-punctual">98%</span>
+              <span class="stat-label">Mi Puntualidad</span>
+            </div>
+          </div>
+          <div class="stat-card success">
+            <div class="stat-icon"><i class="fa-solid fa-graduation-cap"></i></div>
+            <div class="stat-info">
+              <span class="stat-value" id="teacher-stat-classes">5</span>
+              <span class="stat-label">Clases Impartidas</span>
+            </div>
+          </div>
+          <div class="stat-card warning">
+            <div class="stat-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+            <div class="stat-info">
+              <span class="stat-value" id="teacher-stat-pending">1</span>
+              <span class="stat-label">Clases por Firmar Asistencia</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="dashboard-grid" style="grid-template-columns: 1fr 1fr;">
+          <!-- Registrar Entrada/Salida Personal del Docente -->
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title"><i class="fa-solid fa-user-clock"></i>Fichaje Personal (Docente)</h3>
+            </div>
+            <p style="margin-bottom: 18px; font-size: 0.9rem; color: var(--text-muted);">
+              Marque su ingreso y salida de la institución para control administrativo.
+            </p>
+            <div style="display: flex; gap: 12px;" id="teacher-punch-actions">
+              <button class="btn-primary" onclick="markTeacherAttendance('Presente')"><i class="fa-solid fa-right-to-bracket"></i>Marcar Entrada</button>
+              <button class="btn-secondary" onclick="markTeacherAttendance('Salida')"><i class="fa-solid fa-right-from-bracket"></i>Marcar Salida</button>
+            </div>
+            <div id="teacher-punch-status" style="margin-top: 15px; font-weight: 600; font-size: 0.9rem; color: var(--success);">
+              <!-- Estado -->
+            </div>
+          </div>
+
+          <!-- Mis Asignaturas -->
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title"><i class="fa-solid fa-book"></i>Mis Asignaturas y Cursos</h3>
+            </div>
+            <div class="alert-list" id="teacher-courses-list">
+              <!-- Dinámico -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 7. VISTA: TOMA DE ASISTENCIA POR EL DOCENTE -->
+      <section class="view-panel" id="view-teacher-register">
+        <div class="panel-header">
+          <h2 class="panel-title">Toma de Asistencia</h2>
+          <p class="panel-subtitle">Registre la asistencia de los estudiantes del curso</p>
+        </div>
+
+        <div class="card attendance-picker-card">
+          <div class="course-selector-bar">
+            <div class="course-picker">
+              <label class="form-label" style="margin-bottom: 4px;">Seleccione Asignatura / Curso</label>
+              <select class="filter-select" style="width: 100%; background-color: white;" id="teacher-course-select">
+                <!-- Opciones dinámicas -->
+              </select>
+            </div>
+            <div>
+              <label class="form-label" style="margin-bottom: 4px;">Fecha de Sesión</label>
+              <input type="date" class="filter-date" style="background-color: white;" id="teacher-session-date">
+            </div>
+            <div style="margin-top: 20px;">
+              <span style="font-weight: 600; font-size: 0.9rem; color: var(--text-muted);" id="teacher-student-count">Alumnos: 0</span>
+            </div>
+          </div>
+
+          <!-- Listado de Estudiantes del curso seleccionado -->
+          <div class="student-attendance-list" id="student-attendance-sheet">
+            <p style="text-align: center; color: var(--text-muted); padding: 32px 0;">Seleccione un curso para ver la lista de estudiantes.</p>
+          </div>
+
+          <!-- Botón de Envío -->
+          <div style="display: flex; justify-content: flex-end; gap: 12px;">
+            <button class="btn-primary" id="save-attendance-sheet-btn"><i class="fa-solid fa-cloud-arrow-up"></i>Guardar y Confirmar Asistencia</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           VISTAS DEL ESTUDIANTE
+           ==================================================================== -->
+      
+      <!-- 8. VISTA: PANEL DEL ESTUDIANTE -->
+      <section class="view-panel" id="view-student-dashboard">
+        <div class="panel-header">
+          <h2 class="panel-title" id="student-welcome-title">Mi Historial de Asistencia</h2>
+          <p class="panel-subtitle">Consulta de registros mensuales, tardanzas y justificaciones</p>
+        </div>
+
+        <!-- Stats del Estudiante -->
+        <div class="stats-grid">
+          <div class="stat-card primary" id="student-card-pct">
+            <div class="stat-icon"><i class="fa-solid fa-circle-check"></i></div>
+            <div class="stat-info">
+              <span class="stat-value" id="student-stat-pct">100%</span>
+              <span class="stat-label">Mi Porcentaje</span>
+            </div>
+          </div>
+          <div class="stat-card success" id="student-card-present">
+            <div class="stat-icon"><i class="fa-solid fa-user-clock"></i></div>
+            <div class="stat-info">
+              <span class="stat-value" id="student-stat-lates">0</span>
+              <span class="stat-label">Mis Tardanzas</span>
+            </div>
+          </div>
+          <div class="stat-card danger" id="student-card-absent">
+            <div class="stat-icon"><i class="fa-solid fa-user-xmark"></i></div>
+            <div class="stat-info">
+              <span class="stat-value" id="student-stat-absences">0</span>
+              <span class="stat-label">Mis Faltas</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="student-view-layout">
+          <!-- Columna Izquierda: Calendario Mensual -->
+          <div class="card calendar-card">
+            <div class="card-header">
+              <h3 class="card-title"><i class="fa-regular fa-calendar"></i>Control Mensual</h3>
+              <div class="month-selector">
+                <i class="fa-solid fa-chevron-left" style="cursor:pointer;" onclick="changeStudentMonth(-1)"></i>
+                <span id="student-calendar-month-name">Julio 2026</span>
+                <i class="fa-solid fa-chevron-right" style="cursor:pointer;" onclick="changeStudentMonth(1)"></i>
+              </div>
+            </div>
+            <div class="month-grid">
+              <div class="day-header">Lun</div>
+              <div class="day-header">Mar</div>
+              <div class="day-header">Mié</div>
+              <div class="day-header">Jue</div>
+              <div class="day-header">Vie</div>
+              <div class="day-header">Sáb</div>
+              <div class="day-header">Dom</div>
+              <!-- Celdas de días agregadas dinámicamente -->
+            </div>
+            
+            <div style="display:flex; justify-content:center; gap: 16px; margin-top: 24px; flex-wrap: wrap;">
+              <span class="status-badge presente">Presente</span>
+              <span class="status-badge tardanza">Tardanza</span>
+              <span class="status-badge ausente">Ausencia</span>
+              <span class="status-badge justificado">Justificado</span>
+            </div>
+          </div>
+
+          <!-- Columna Derecha: Formulario de Solicitud de Justificación -->
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title"><i class="fa-solid fa-file-invoice"></i>Justificar Ausencia</h3>
+            </div>
+            <form id="justification-request-form">
+              <div class="form-group">
+                <label class="form-label">Fecha de Inasistencia</label>
+                <input type="date" class="form-control" id="just-date" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Motivo o Razón</label>
+                <textarea class="form-control" id="just-reason" placeholder="Describa el motivo de la falta (médico, familiar, viaje, etc.)..." required></textarea>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Documento de Respaldo</label>
+                <input type="file" class="form-control" id="just-file" style="padding: 6px;">
+              </div>
+              <button type="submit" class="btn-primary" style="width: 100%; justify-content: center;">
+                <i class="fa-solid fa-paper-plane"></i>Enviar Solicitud
+              </button>
+            </form>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ==========================================
+       MODAL: CREAR/EDITAR ASISTENCIA (ADMIN)
+       ========================================== -->
+  <div class="modal-overlay" id="add-log-modal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 class="modal-title" id="log-modal-title">Nuevo Registro de Asistencia</h3>
+        <button class="modal-close" id="close-log-modal"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <form id="attendance-log-form">
+          <input type="hidden" id="edit-log-id">
+          
+          <div class="form-group">
+            <label class="form-label">Estudiante</label>
+            <select class="form-control" id="modal-student-select" required>
+              <!-- Dinámico -->
+            </select>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">Curso</label>
+            <select class="form-control" id="modal-course-select" required>
+              <!-- Dinámico -->
+            </select>
+          </div>
+          
+          <div class="form-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div>
+              <label class="form-label">Fecha</label>
+              <input type="date" class="form-control" id="modal-date" required>
+            </div>
+            <div>
+              <label class="form-label">Hora</label>
+              <input type="time" class="form-control" id="modal-time" required>
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">Estado</label>
+            <select class="form-control" id="modal-state-select" required>
+              <option value="Presente">Presente</option>
+              <option value="Tardanza">Tardanza</option>
+              <option value="Ausente">Ausente</option>
+              <option value="Justificado">Justificado</option>
+            </select>
+          </div>
+          
+          <div class="form-group" id="modal-tardanza-note-group" style="display: none;">
+            <label class="form-label">Nota de Tardanza (Hora de ingreso, ej: 08:03)</label>
+            <input type="text" class="form-control" id="modal-time-note" placeholder="08:03">
+          </div>
+          
+          <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
+            <button type="button" class="btn-secondary" id="cancel-log-modal">Cancelar</button>
+            <button type="submit" class="btn-primary">Guardar Registro</button>
+          </div>
+        </form>
+      </div>
+  </div>
+
+  <!-- Scripts del Sistema -->
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,161 @@
+-- ==========================================================================
+-- ESTRUCTURA DE BASE DE DATOS PARA POSTGRESQL (SUPABASE)
+-- SISTEMA DE CONTROL DE ASISTENCIA - COLEGIO SAN JOSÉ DE CALASANZ
+-- ==========================================================================
+
+-- --------------------------------------------------------------------------
+-- 1. CREACIÓN DE ENUMS PERSONALIZADOS (Tipos de datos especiales)
+-- --------------------------------------------------------------------------
+CREATE TYPE estado_asistencia AS ENUM ('Presente', 'Tardanza', 'Ausente', 'Justificado');
+CREATE TYPE estado_justificacion AS ENUM ('Pendiente', 'Aprobado', 'Rechazado');
+
+-- --------------------------------------------------------------------------
+-- 2. TABLA: tipos_documento
+-- --------------------------------------------------------------------------
+CREATE TABLE tipos_documento (
+    id_tipo_doc SERIAL PRIMARY KEY,
+    nombre_documento VARCHAR(50) NOT NULL UNIQUE
+);
+
+-- Insertar valores iniciales por defecto
+INSERT INTO tipos_documento (nombre_documento) VALUES 
+('DNI'), ('Carnet de Extranjería'), ('Pasaporte');
+
+-- --------------------------------------------------------------------------
+-- 3. TABLA: roles
+-- --------------------------------------------------------------------------
+CREATE TABLE roles (
+    id_rol SERIAL PRIMARY KEY,
+    nombre_rol VARCHAR(30) NOT NULL UNIQUE
+);
+
+-- Insertar roles del sistema
+INSERT INTO roles (nombre_rol) VALUES 
+('Administrativo'), ('Docente'), ('Estudiante'), ('Apoderado');
+
+-- --------------------------------------------------------------------------
+-- 4. TABLA: usuarios (Centraliza credenciales y datos básicos)
+-- --------------------------------------------------------------------------
+CREATE TABLE usuarios (
+    id_usuario SERIAL PRIMARY KEY,
+    id_tipo_doc INT REFERENCES tipos_documento(id_tipo_doc) ON DELETE SET NULL,
+    numero_documento VARCHAR(20) NOT NULL,
+    nombres VARCHAR(100) NOT NULL,
+    apellidos VARCHAR(100) NOT NULL,
+    celular VARCHAR(15),
+    direccion VARCHAR(255),
+    correo VARCHAR(100) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL, -- Almacenará la contraseña hasheada
+    id_rol INT NOT NULL REFERENCES roles(id_rol) ON DELETE RESTRICT,
+    estado BOOLEAN DEFAULT TRUE NOT NULL, -- TRUE: Activo, FALSE: Inactivo
+    fecha_registro TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+    
+    CONSTRAINT uq_documento UNIQUE (id_tipo_doc, numero_documento)
+);
+
+-- --------------------------------------------------------------------------
+-- 5. TABLA: datos_estudiante (Extensión de datos médicos para alumnos 1:1)
+-- --------------------------------------------------------------------------
+CREATE TABLE datos_estudiante (
+    id_datos_estudiante SERIAL PRIMARY KEY,
+    id_usuario INT NOT NULL UNIQUE REFERENCES usuarios(id_usuario) ON DELETE CASCADE,
+    tipo_sangre VARCHAR(5),
+    alergias TEXT,
+    seguro_medico VARCHAR(100),
+    observaciones_medicas TEXT
+);
+
+-- --------------------------------------------------------------------------
+-- 6. TABLA: parentescos (Relación N a N entre Padres y Alumnos)
+-- --------------------------------------------------------------------------
+CREATE TABLE parentescos (
+    id_parentesco SERIAL PRIMARY KEY,
+    id_apoderado INT NOT NULL REFERENCES usuarios(id_usuario) ON DELETE CASCADE,
+    id_estudiante INT NOT NULL REFERENCES usuarios(id_usuario) ON DELETE CASCADE,
+    parentesco VARCHAR(30) NOT NULL, -- 'Madre', 'Padre', 'Tutor', etc.
+    
+    CONSTRAINT uq_apoderado_estudiante UNIQUE (id_apoderado, id_estudiante)
+);
+
+-- --------------------------------------------------------------------------
+-- 7. TABLA: tarjetas_identificacion (Códigos de barra o NFC para App Móvil)
+-- --------------------------------------------------------------------------
+CREATE TABLE tarjetas_identificacion (
+    id_tarjeta SERIAL PRIMARY KEY,
+    id_usuario INT NOT NULL UNIQUE REFERENCES usuarios(id_usuario) ON DELETE CASCADE,
+    codigo_barra VARCHAR(50) NOT NULL UNIQUE,
+    fecha_emision DATE DEFAULT CURRENT_DATE NOT NULL,
+    estado BOOLEAN DEFAULT TRUE NOT NULL -- TRUE: Activa, FALSE: Bloqueada/Extraviada
+);
+
+-- --------------------------------------------------------------------------
+-- 8. TABLA: grados_secciones (Aulas de la institución)
+-- --------------------------------------------------------------------------
+CREATE TABLE grados_secciones (
+    id_aula SERIAL PRIMARY KEY,
+    grado VARCHAR(30) NOT NULL,    -- Ej. '3º Primaria'
+    seccion VARCHAR(5) NOT NULL,    -- Ej. 'A'
+    nivel VARCHAR(20) NOT NULL,     -- Ej. 'Primaria', 'Secundaria'
+    anio_academico INT NOT NULL     -- Ej. 2026
+);
+
+-- --------------------------------------------------------------------------
+-- 9. TABLA: estudiante_aula (Relación de alumnos asignados a aulas)
+-- --------------------------------------------------------------------------
+CREATE TABLE estudiante_aula (
+    id_estudiante_aula SERIAL PRIMARY KEY,
+    id_estudiante INT NOT NULL REFERENCES usuarios(id_usuario) ON DELETE CASCADE,
+    id_aula INT NOT NULL REFERENCES grados_secciones(id_aula) ON DELETE CASCADE,
+    
+    CONSTRAINT uq_estudiante_aula UNIQUE (id_estudiante, id_aula)
+);
+
+-- --------------------------------------------------------------------------
+-- 10. TABLA: asistencias (Control de entrada diario - Portería/App)
+-- --------------------------------------------------------------------------
+CREATE TABLE asistencias (
+    id_asistencia SERIAL PRIMARY KEY,
+    id_usuario INT NOT NULL REFERENCES usuarios(id_usuario) ON DELETE CASCADE,
+    fecha DATE DEFAULT CURRENT_DATE NOT NULL,
+    hora_entrada TIME NOT NULL,
+    hora_salida TIME NULL, -- NULABLE: Se rellena al marcar la salida
+    estado_entrada estado_asistencia NOT NULL, -- 'Presente', 'Tardanza', 'Ausente', 'Justificado'
+    time_note VARCHAR(10) NULL, -- Guarda el desfase del retraso si aplica (ej. '08:15')
+    
+    -- Restricción para evitar duplicados del mismo usuario el mismo día
+    CONSTRAINT uq_usuario_fecha UNIQUE (id_usuario, fecha)
+);
+
+-- --------------------------------------------------------------------------
+-- 11. TABLA: justificaciones (Solicitudes creadas por apoderados/estudiantes)
+-- --------------------------------------------------------------------------
+CREATE TABLE justificaciones (
+    id_justificacion SERIAL PRIMARY KEY,
+    id_estudiante INT NOT NULL REFERENCES usuarios(id_usuario) ON DELETE CASCADE,
+    id_apoderado INT REFERENCES usuarios(id_usuario) ON DELETE SET NULL, -- Opcional
+    fecha_inasistencia DATE NOT NULL,
+    motivo TEXT NOT NULL,
+    evidencia_foto VARCHAR(255) NULL, -- Opcional: Ruta en Supabase Storage
+    estado estado_justificacion DEFAULT 'Pendiente' NOT NULL, -- 'Pendiente', 'Aprobado', 'Rechazado'
+    fecha_solicitud TIMESTAMPTZ DEFAULT NOW() NOT NULL
+);
+
+-- --------------------------------------------------------------------------
+-- 12. ÍNDICES DE RENDIMIENTO (Claves para búsquedas rápidas en App y Dashboard)
+-- --------------------------------------------------------------------------
+
+-- Buscar asistencias rápidamente por fecha (Dashboard Diario y Reportes)
+CREATE INDEX idx_asistencias_fecha ON asistencias(fecha);
+
+-- Buscar historial de un estudiante específico rápidamente
+CREATE INDEX idx_asistencias_usuario ON asistencias(id_usuario);
+
+-- Búsqueda de justificaciones pendientes por revisar para el Admin
+CREATE INDEX idx_justificaciones_estado ON justificaciones(estado);
+
+-- Búsqueda rápida de justificaciones de un alumno
+CREATE INDEX idx_justificaciones_estudiante ON justificaciones(id_estudiante);
+
+-- Enlaces rápidos para notificaciones al apoderado (App Móvil)
+CREATE INDEX idx_parentescos_apoderado ON parentescos(id_apoderado);
+CREATE INDEX idx_parentescos_estudiante ON parentescos(id_estudiante);
